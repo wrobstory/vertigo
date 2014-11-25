@@ -30,7 +30,7 @@
 (deftest test-over
   (are [expected fields]
     (= expected (c/over int64-matrices fields))
-    
+
     (range 0 10)     [0 0 _]
     (range 0 1000)   [_ _ _]
     (range 990 1000) [9 9 _]
@@ -119,6 +119,15 @@
         (let [n 11]
           (c/doreduce [x (over int64-matrices [n _ _])] [sum 0]
             (+ x sum))))))
+
+(deftest test-core-common
+  (let [^:s/int64 fiver (c/marshal-seq s/int64 [0 1 2 3 4])
+        ^:s/int64 every (c/marshal-seq s/int64 [1 1 1 1 1])]
+    (is (= (c/sum fiver) 10))
+    (is (true? (c/every? [x every] (= x 1))))
+    (is (= (c/mean fiver) 2))
+    (is (= (c/max! fiver) 4))
+    (is (= (c/min! fiver) 0))))
 
 ;;;
 

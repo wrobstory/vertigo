@@ -169,7 +169,7 @@
   ;; can't go any deeper
   (when-not (instance? IFixedCompoundType type)
     (throw (IllegalArgumentException. (str "Invalid field '" field "' for non-compound type " (name type)))))
-  
+
   ;; if it's a symbol, it must be for an index
   (when (and (symbol? field) (not (s/has-field? type 0)))
     (throw (IllegalArgumentException. (str "'" field "' is assumed to be numeric, which isn't accepted by " (name type)))))
@@ -205,7 +205,7 @@
                          limits)}))
           {:types [type], :type-form-fn identity, :offsets [],  :lengths [], :limits {}}
           fields)
-        
+
         inner-type (or (last types) type)
 
         ;; take a bunch of numbers and forms, and collapse all the numbers together
@@ -240,7 +240,7 @@
                                 {:offset-exprs (collapse-exprs (map :offset field-descriptors))
                                  :length (apply min (map :length field-descriptors))
                                  :stride (apply max (map :stride field-descriptors))})))]
-    
+
     {:types (rest types)
      :cross-sections cross-sections
      :slice slice
@@ -256,7 +256,7 @@
                               (throw (IndexOutOfBoundsException. (str ~(str field) ": " ~field)))))
                          limits)}))
 
-;;; 
+;;;
 
 (defn- field-operation
   [env x fields validate? inlined-form non-inlined-form]
@@ -499,7 +499,7 @@
                                 Integer/MAX_VALUE)
                               fields))
                           seqs
-                          fields) 
+                          fields)
             lengths (map
                       (fn [seq-syms lengths]
                         (cons
@@ -522,7 +522,7 @@
                          (if (and (number? a) (number? b))
                            (min a b)
                            `(p/min ~a ~b)))))
-            
+
             limits (merge bounds
                      (if-let [limit (seq-options :limit)]
                        (if (= 1 (count iterators))
@@ -530,7 +530,7 @@
                          (throw (IllegalArgumentException.
                                   ":limit is ambiguous when there are multiple free variables.")))
                        (seq-options :limits)))]
-        
+
         (doseq [k (keys limits)]
           (when (and
                   (number? (limits k))
@@ -538,7 +538,7 @@
                   (> (limits k) (bounds k)))
             (throw (IllegalArgumentException.
                      (str ":limit of " (limits k) " is greater than max value " (bounds k))))))
-        
+
         (merge
 
           (update-in arguments [:seqs]
@@ -580,7 +580,7 @@
                  `((let [cnt# ~count-expr]
                      (when (>= limit## cnt#)
                        (throw (IndexOutOfBoundsException. (str cnt#)))))))
-             
+
              (loop [idx## 0, ~@(mapcat
                                  (fn [{:keys [initial sym]}]
                                    [sym initial])
@@ -593,20 +593,20 @@
                    ~(walk-return-exprs
                       (fn [x]
                         (cond
-                          
+
                           (and (seq? x) (= 'break (first x)))
                           (if (= 2 (count x))
                             (second x)
                             `(tuple ~@(rest x)))
-                          
+
                           (= 1 (count values))
                           `(recur (p/+ idx## ~step) ~x)
-                          
+
                           (not= (count values) (count x))
                           (throw
                             (IllegalArgumentException.
                               (str "expected " (count values) " return values, got " (count x))))
-                          
+
                           :else
                           `(recur (p/+ idx## ~step) ~@x)))
 
@@ -614,7 +614,7 @@
                         `(do ~@body)
                         (map :element seqs)
                         (map :sym values))))
-                 
+
                  ~(if (= 1 (count values))
                     (:sym (first values))
                     `(tuple ~@(map :sym values))))))))
@@ -628,20 +628,20 @@
                     ~(walk-return-exprs
                        (fn [x]
                          (cond
-                             
+
                            (and (seq? x) (= 'break (first x)))
                            (if (= 2 (count x))
                              (second x)
                              `(tuple ~@(rest x)))
-                             
+
                            (= 1 (count values))
                            `(recur ~@(map :sym iterators) ~x)
-                             
+
                            (not= (count values) (count x))
                            (throw
                              (IllegalArgumentException.
                                (str "expected " (count values) " return values, got " (count x))))
-                             
+
                            :else
                            `(recur ~@(map :sym iterators) ~@x)))
 
@@ -649,7 +649,7 @@
                          `(do ~@body)
                          (map :element seqs)
                          (map :sym values))))
-            
+
             root-iterator (last iterators)]
 
         (unify-gensyms
@@ -677,7 +677,7 @@
                             `(when (>= ~sym (long ~limit))
                                (throw (IndexOutOfBoundsException.
                                         (str ~(str sym) ": "(str ~sym)))))))))
-               
+
                (loop [~@(interleave (map :sym (butlast iterators)) (repeat 0))
                       ~(:sym root-iterator) ~(- (:step root-iterator))
                       ~@(mapcat
@@ -733,7 +733,7 @@
    syntax.  This is faster than passing in a sequence which has been called with `over`
    elsewhere, and should be used inline where possible:
 
-        (doreduce [x (over s [_ :a :b])] [sum 0] 
+        (doreduce [x (over s [_ :a :b])] [sum 0]
           (+ x sum)
 
    Both the `:step` and `:limit` for iteration may be specified:
@@ -766,6 +766,32 @@
   `(doreduce [x# ~s ~@options] [sum# 0]
      (p/+ x# sum#)))
 
+(defmacro mean
+  "Returns the mean of all numbers within the sequence.
+      (mean s)
+  or
+      (mean s :step 2 :limit 10)"
+  [s & options]
+  `(let [[^java.lang.Long summed# ^java.lang.Long counted#]
+         (doreduce [x# ~s ~@options] [sum# 0, cnt# 0]
+           [(p/+ sum# x#) (p/+ 1 cnt#)])]
+      (p/div summed# counted#)))
+
+(defmacro compares
+  [[s & options] operator]
+  `(doreduce [x# ~s ~@options] [comps# 0]
+     (if (~operator x# comps#)
+       x#
+       comps#)))
+
+(defmacro max!
+  [s & options]
+  `(compares [~s ~@options] p/>))
+
+(defmacro min!
+  [s & options]
+  `(compares [~s ~@options] p/<))
+
 (defmacro every?
   "Returns true if `pred-expr` returns true for all `x` in `s`.
 
@@ -778,7 +804,7 @@
   `(doreduce [~x ~s ~@options] [bool# true]
      (if ~pred-expr
        true
-       (break false))))
+       ('break false))))
 
 (defmacro any?
   "Returns true if `pred-expr` returns true for some `x` in `s`.
@@ -791,5 +817,5 @@
   [[x s & options] pred-expr]
   `(doreduce [~x ~s ~@options] [bool# false]
      (if ~pred-expr
-       (break true)
+       ('break true)
        false)))
