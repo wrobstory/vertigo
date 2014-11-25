@@ -767,17 +767,31 @@
      (p/+ x# sum#)))
 
 (defmacro mean
-  "Returns the mean of all numbers within the sequence.
+  "Returns the mean (float) of all numbers within the sequence.
+
       (mean s)
+
   or
-      (mean s :step 2 :limit 10)"
+
+      (mean s :step 2 :limit 10)
+
+  Note that the sum/count will be cast to floats before division, and
+  will be subject to floating point math"
   [s & options]
   `(let [[^java.lang.Long summed# ^java.lang.Long counted#]
          (doreduce [x# ~s ~@options] [sum# 0, cnt# 0]
            [(p/+ sum# x#) (p/+ 1 cnt#)])]
-      (p/div summed# counted#)))
+      (p/div (float summed#) (float counted#))))
 
 (defmacro compares
+  "Compares x in a sequence to each x before. Used to implement macros
+  such as max
+
+      (compares s >)
+
+  or min
+
+      (compares s <)"
   [[s & options] operator]
   `(doreduce [x# ~s ~@options] [comps# 0]
      (if (~operator x# comps#)
@@ -785,10 +799,16 @@
        comps#)))
 
 (defmacro max!
+  "Returns max value of all numbers in sequence
+
+  (max s)"
   [s & options]
   `(compares [~s ~@options] p/>))
 
 (defmacro min!
+  "Returns min value of all numbers in sequence
+
+  (min s)"
   [s & options]
   `(compares [~s ~@options] p/<))
 

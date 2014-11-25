@@ -125,7 +125,7 @@
         ^:s/int64 every (c/marshal-seq s/int64 [1 1 1 1 1])]
     (is (= (c/sum fiver) 10))
     (is (true? (c/every? [x every] (= x 1))))
-    (is (= (c/mean fiver) 2))
+    (is (= (c/mean fiver) 2.0))
     (is (= (c/max! fiver) 4))
     (is (= (c/min! fiver) 0))))
 
